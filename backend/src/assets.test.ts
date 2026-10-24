@@ -369,4 +369,59 @@ describe("Assets API Configuration", () => {
       ]);
     });
   });
+
+  describe("Edge cases in Asset allowlist endpoint (SSB-2026-125)", () => {
+    it("handles duplicate and mixed-case asset codes deterministically without duplicate side effects", async () => {
+      vi.stubEnv("ALLOWED_ASSETS", "  uSdc , XLM , usdc , Xlm , USDC , EURC , eurc  ");
+
+      const { initDb, getAllowedAssets } = await import("./services/db");
+      initDb();
+
+      const { app } = await import("./index");
+      const { getJwtSecret } = await import("./services/auth");
+      const adminToken = jwt.sign(
+        { role: "admin", accountId: "admin", isAdmin: true },
+        getJwtSecret(),
+        { expiresIn: "1h" },
+      );
+
+      // Verify startup state persisted in DB double
+      const stored = getAllowedAssets();
+      expect(stored).toEqual(["EURC", "USDC", "XLM"]);
+
+      // Verify GET /api/assets status, response structure, and normalized sorted asset list
+      const publicRes = await request(app).get("/api/assets");
+      expect(publicRes.status).toBe(200);
+      expect(publicRes.body).toHaveProperty("data");
+      expect(publicRes.body.data).toEqual(["EURC", "USDC", "XLM"]);
+
+      // Admin adding an existing asset with mixed-case and redundant whitespace produces no duplicate side effects
+      const dupPostRes = await request(app)
+        .post("/api/admin/assets")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ code: "  xLm  " });
+      expect(dupPostRes.status).toBe(200);
+      expect(dupPostRes.body.data).toEqual(["EURC", "USDC", "XLM"]);
+      expect(getAllowedAssets()).toEqual(["EURC", "USDC", "XLM"]);
+
+      // Deleting case-insensitively removes only the target asset
+      const deleteRes = await request(app)
+        .delete("/api/admin/assets/UsDc")
+        .set("Authorization", `Bearer ${adminToken}`);
+      expect(deleteRes.status).toBe(200);
+      expect(deleteRes.body.data).toEqual(["EURC", "XLM"]);
+      expect(getAllowedAssets()).toEqual(["EURC", "XLM"]);
+    });
+
+    it("fails cleanly on invalid configuration on startup with isolated DB double and leaves store unseeded", async () => {
+      vi.stubEnv("ALLOWED_ASSETS", "USDC, INVALID_TOOLONG_CODE, XLM");
+
+      const { initDb, getAllowedAssets } = await import("./services/db");
+      // initDb calls seedAllowedAssets which throws an error when configuration is invalid
+      expect(() => initDb()).toThrow(/Invalid configuration on startup/);
+
+      // DB should not have partial assets seeded
+      expect(getAllowedAssets()).toEqual([]);
+    });
+  });
 });
