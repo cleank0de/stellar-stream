@@ -1,9 +1,9 @@
 # Stream Progress Math Observability
 
-**Batch ID**: SSB-2026-129  
+**Batch ID**: SSB-2026-126 / SSB-2026-129  
 **Area**: `backend`
 
-This document specifies the observable telemetry and runbook procedures for Stream progress math calculations (`calculateProgress`), covering boundaries (before start, at start, at end) and system clock moving backwards.
+This document specifies the boundary behavior, status codes, observable telemetry, and runbook procedures for Stream progress math calculations (`calculateProgress`), covering boundaries (before start, at start, at end) and system clock moving backwards.
 
 ---
 

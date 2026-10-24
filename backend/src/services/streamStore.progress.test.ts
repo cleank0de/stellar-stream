@@ -603,7 +603,7 @@ describe("calculateProgress", () => {
     });
   });
 
-  describe("Consistency rule: vested plus remaining equals total (SSB-2026-128)", () => {
+  describe("Boundary behavior and consistency rule for Stream progress math (SSB-2026-126 / SSB-2026-128)", () => {
     it("ensures vestedAmount + remainingAmount equals totalAmount across lifecycle boundaries", () => {
       const stream = createBaseStream({
         id: "stream-consistency-1",
